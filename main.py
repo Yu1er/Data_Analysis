@@ -166,8 +166,11 @@ if __name__ == '__main__':
     noref_hit_durtime, noref_hit_md5, md5_to_lpn, noref_hit_lpnupdate = {}, {}, {}, {}
     # 首次以cold_LPN写入的md5码、以cold-lpn写入并被hit的次数(变为未引用数据前)
     cold_in_md5, cold_in_hit, hot_in_md5 = {}, {}, {}
-    # 相同数据上一次写入的时候的时间、两个重复数据间写入了多少数据
-    rehit_time, rehit_durtime = {}, {}
+    # 相同数据上一次写入的时候的时间、两个重复数据间写入了多少数据、md5码对应的md5-lpn指纹映射是否有效、判断某个lpn是否被记录在md5-lpn映射中
+    rehit_time, rehit_durtime, invaild_md5_lpn, is_md5_lpn = {}, {}, {}, {}
+    # md5码对应的md5-lpn指纹无效但是md5码又被命中的次数
+    invalid_hit = 0
+    zw_md5_lpn, zw_lpn_md5 = {}, {}
     # 写入过但是此时未被引用的数据又被命中的次数、总共产生过的“未被引用的数据”
     noref_hit_times, noref_num = 0, 0
     # 写入过的lba、读取过的lba、读写过的lba
@@ -209,6 +212,7 @@ if __name__ == '__main__':
                     else:
                         noref_hit_lpnupdate[last_lpn_update] = 1
 
+                # if (lba_b / 8 not in lpn) or (lpn_to_md5[lba_b / 8] != md5_now) :  # 只有当原来这个lpn中的内容不是md5时引用计数才增加
                 md5_ref_live[md5_now] = md5_ref_live[md5_now] + 1
                 md5_n[md5_now] = md5_n[md5_now] + 1
                 sam = sam + siz[i]
@@ -220,8 +224,19 @@ if __name__ == '__main__':
                 else:
                     rehit_durtime[dt] = 1
 
-                if (md5_now in cold_in_md5) and (
-                        md5_now not in md5_noref_time):  # 如果当前的md5码在这个md5_noref_time中说明曾经成为过未引用数据
+                # if (md5_now in invaild_md5_lpn) and (invaild_md5_lpn[md5_now] == 1):
+                #     invalid_hit = invalid_hit + 1
+                #     invaild_md5_lpn[md5_now] = 0
+                if zw_md5_lpn[md5_now] == -1:  # 如果当前写入的md5的md5-lpn映射是无效的，则本次写入看作是第一次写入，更新md5-lpn映射
+                    zw_md5_lpn[md5_now] = lba_b / 8
+                    invalid_hit = invalid_hit + 1
+                if lba_b / 8 in zw_lpn_md5:
+                    old_md5 = zw_lpn_md5[lba_b / 8]
+                    zw_lpn_md5[old_md5] = -1
+                zw_lpn_md5[lba_b / 8] = md5_now
+
+                if (md5_now in cold_in_md5):  # 如果当前的md5码在这个md5_noref_time中说明曾经成为过未引用数据
+                    #  and (md5_now not in md5_noref_time)
                     if md5_now in cold_in_hit:
                         cold_in_hit[md5_now] = cold_in_hit[md5_now] + 1
                     else:
@@ -231,6 +246,12 @@ if __name__ == '__main__':
                 md5_ref_live[md5_now] = 1
                 w_uniq = w_uniq + siz[i]
                 rehit_time[md5_now] = wi  # 第一次写入时记录写入的时间
+                # is_md5_lpn[lba_b / 8] = 1 # md5码第一次写入时会记录md5-lpn映射（后面再写入相同的md5则不更新映射、而是根据现有的映射进行重映射（重删）
+                zw_md5_lpn[md5_now] = lba_b / 8  # md5码第一次写入时会记录md5-lpn映射
+                if lba_b / 8 in zw_lpn_md5:
+                    old_md5 = zw_lpn_md5[lba_b / 8]
+                    zw_md5_lpn[old_md5] = -1
+                zw_lpn_md5[lba_b / 8] = md5_now
 
             lpn_b = int(lba_b / 8)
             lpn_e = int(lba_e / 8)
@@ -239,12 +260,15 @@ if __name__ == '__main__':
             for j in range(lpn_b, lpn_e):
                 if j in lpn:
                     lpn[j] = lpn[j] + 1
-                    if lpn_to_md5[j] != md5_now:  # 当前要写入的lpn有对应的md5，但是和当前要写入的md5不一样（即lpn被更新为其他数据），此时要将原md5的引用数量减1
-                        md5_ref_live[md5_now] = md5_ref_live[md5_now] - 1
-                        if md5_ref_live[md5_now] == 0:
+                    md5_bef = lpn_to_md5[j]
+                    if md5_bef != md5_now:  # 当前要写入的lpn有对应的md5，但是和当前要写入的md5不一样（即lpn被更新为其他数据），此时要将原md5的引用数量减1
+                        md5_ref_live[md5_bef] = md5_ref_live[md5_bef] - 1
+                        # if is_md5_lpn[j] == 1:  # 如果这个lpn是被记录在md5-lpn的映射中的
+                        #     invaild_md5_lpn[md5_bef] = 1  # 此时原来的md5码对应的md5-lpn映射失效
+                        if md5_ref_live[md5_bef] == 0:
                             noref_num = noref_num + 1
-                            md5_noref_time[md5_now] = wi  # 成为未被引用的数据的时间
-                            md5_to_lpn[md5_now] = lpn_b  # md5在成为未引用数据前的最后一个对应的lpn
+                            md5_noref_time[md5_bef] = wi  # 成为未被引用的数据的时间
+                            md5_to_lpn[md5_bef] = lpn_b  # md5在成为未引用数据前的最后一个对应的lpn
                 else:
                     lpn[j] = 1
                 lpn_to_md5[j] = md5_now
@@ -302,10 +326,13 @@ if __name__ == '__main__':
     writef.write('"未被引用的数据"被用于重删：' + str(noref_hit_times * 8.0 / 2 / 1024 / 1024) + ' GB \n')
     writef.write('"未被引用的数据"被用于重删的几率("未被引用的数据"被用于重删/产生过的"未被引用的数据")：' + str(noref_hit_times * 1.0 / noref_num) + ' \n')
 
-    # lpn_update_times()
-    # md5_count()
-    # noref_rehit_count()
-    # noref_hit_durtime_count()
-    # noref_hit_lpnupdate_count()
-    # cold_in_hit_count()
+    print('lba更新后其指纹被再次命中的概率(/总数据量)：' + str(invalid_hit * 8.0 / w_siz) + ' \n')
+    print('lba更新后其指纹被再次命中的概率(/重复数据量)：' + str(invalid_hit * 8.0 / sam) + ' \n')
+
+    lpn_update_times()
+    md5_count()
+    noref_rehit_count()
+    noref_hit_durtime_count()
+    noref_hit_lpnupdate_count()
+    cold_in_hit_count()
     rehit_durtime_count()
