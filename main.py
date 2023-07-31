@@ -117,18 +117,6 @@ def cold_hot_percent(p):
                 hlpn_cmd5 = hlpn_cmd5 + 1
             else:
                 hlpn_hmd5 = hlpn_hmd5 + 1
-    # for key in md5_to_lpn:
-    #     data = md5_to_lpn[key]
-    #     if md5_n[key] <= int(md5_thresh):
-    #         if lpn[data] <= int(lpn_thresh):
-    #             clpn_cmd5 = clpn_cmd5 + 1
-    #         else:
-    #             hlpn_cmd5 = hlpn_cmd5 + 1
-    #     else:
-    #         if lpn[data] <= int(lpn_thresh):
-    #             clpn_hmd5 = clpn_hmd5 + 1
-    #         else:
-    #             hlpn_hmd5 = hlpn_hmd5 + 1
     sum0 = clpn_cmd5 + clpn_hmd5 + hlpn_cmd5 + hlpn_hmd5
     write_file = 'cold_hot_percent_' + x + '.txt'
     writef = open(write_file, 'a')
@@ -211,6 +199,7 @@ if __name__ == '__main__':
                         noref_hit_lpnupdate[last_lpn_update] = noref_hit_lpnupdate[last_lpn_update] + 1
                     else:
                         noref_hit_lpnupdate[last_lpn_update] = 1
+                    md5_to_lpn[md5_now] = lba_b / 8
 
                 if (lba_b / 8 not in lpn_to_md5) or (lpn_to_md5[lba_b / 8] != md5_now):  # 只有当原来这个lpn中的内容不是md5时引用计数才增加
                     md5_ref_live[md5_now] = md5_ref_live[md5_now] + 1
@@ -264,7 +253,7 @@ if __name__ == '__main__':
                         if md5_ref_live[md5_bef] == 0:
                             noref_num = noref_num + 1
                             md5_noref_time[md5_bef] = wi  # 成为未被引用的数据的时间
-                            md5_to_lpn[md5_bef] = lpn_b  # md5在成为未引用数据前的最后一个对应的lpn
+                            # md5_to_lpn[md5_bef] = lpn_b  # md5在成为未引用数据前的最后一个对应的lpn
                 else:
                     lpn[j] = 1
                 lpn_to_md5[j] = md5_now
