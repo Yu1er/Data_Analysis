@@ -137,6 +137,23 @@ def rehit_durtime_count():
         writef.write(str(key) + ' ' + str(rehit_durtime[key]) + '\n')
 
 
+def noref_count():
+    noref_md5_count = {}  # 统计 md5成为未引用数据的次数 的个数，即比如 4次成为未引用数据的 md码有几个
+    for key in noref_num_md5:
+        nums = noref_num_md5[key]
+        if nums in noref_md5_count:
+            noref_md5_count[nums] = noref_md5_count[nums] + 1
+        else:
+            noref_md5_count[nums] = 1
+    sorted_key = sorted(noref_md5_count)
+    # print(sorted_key)
+    write_file = 'noref_md5_count' + x + '.txt'
+    writef = open(write_file, 'w')
+    writef = open(write_file, 'a')
+    for key in sorted_key:
+        writef.write(str(key) + ' ' + str(noref_md5_count[key]) + '\n')
+
+
 # 按间距中的绿色按钮以运行脚本。
 if __name__ == '__main__':
     x = str(input('file:'))
@@ -159,6 +176,8 @@ if __name__ == '__main__':
     # md5码对应的md5-lpn指纹无效但是md5码又被命中的次数
     invalid_hit = 0
     zw_md5_lpn, zw_lpn_md5 = {}, {}
+    # 每个md5码成为未引用数据的次数（noref_hit_times统计的是成为未引用后又被命中的次数，这里统计的不需要命中）
+    noref_num_md5 = {}
     # 写入过但是此时未被引用的数据又被命中的次数、总共产生过的“未被引用的数据”
     noref_hit_times, noref_num = 0, 0
     # 写入过的lba、读取过的lba、读写过的lba
@@ -252,6 +271,10 @@ if __name__ == '__main__':
                         md5_ref_live[md5_bef] = md5_ref_live[md5_bef] - 1
                         if md5_ref_live[md5_bef] == 0:
                             noref_num = noref_num + 1
+                            if md5_bef in noref_num_md5:
+                                noref_num_md5[md5_bef] = noref_num_md5[md5_bef] + 1
+                            else:
+                                noref_num_md5[md5_bef] = 1
                             md5_noref_time[md5_bef] = wi  # 成为未被引用的数据的时间
                             # md5_to_lpn[md5_bef] = lpn_b  # md5在成为未引用数据前的最后一个对应的lpn
                 else:
@@ -314,10 +337,11 @@ if __name__ == '__main__':
     print('lba更新后其指纹被再次命中的概率(/总数据量)：' + str(invalid_hit * 8.0 / w_siz) + ' \n')
     print('lba更新后其指纹被再次命中的概率(/重复数据量)：' + str(invalid_hit * 8.0 / sam) + ' \n')
 
-    lpn_update_times()
-    md5_count()
-    noref_rehit_count()
-    noref_hit_durtime_count()
-    noref_hit_lpnupdate_count()
-    cold_in_hit_count()
-    rehit_durtime_count()
+    # lpn_update_times()
+    # md5_count()
+    # noref_rehit_count()
+    # noref_hit_durtime_count()
+    # noref_hit_lpnupdate_count()
+    # cold_in_hit_count()
+    # rehit_durtime_count()
+    # noref_count()
